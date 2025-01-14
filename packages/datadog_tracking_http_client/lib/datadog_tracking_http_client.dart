@@ -44,25 +44,31 @@ extension TrackingExtension on DatadogConfiguration {
   ///
   /// See also [DatadogConfiguration.firstPartyHostsWithTracingHeaders],
   /// [DatadogConfiguration.firstPartyHosts], [TracingHeaderType]
-  void enableHttpTracking(
-      {DatadogTrackingHttpClientListener? clientListener,
-      List<RegExp> ignoreUrlPatterns = const []}) {
+  void enableHttpTracking({
+    DatadogTrackingHttpClientListener? clientListener,
+    List<RegExp> ignoreUrlPatterns = const [],
+    Map<String, Object?> arguments = const {},
+  }) {
     additionalConfig[trackResourcesConfigKey] = true;
     addPlugin(DdHttpTrackingPluginConfiguration(
       clientListener: clientListener,
       ignoreUrlPatterns: ignoreUrlPatterns,
+      arguments: arguments,
     ));
   }
 }
 
 extension TrackingExtensionExisting on DatadogAttachConfiguration {
   /// See [TrackingExtension.enableHttpTracking]
-  void enableHttpTracking(
-      {DatadogTrackingHttpClientListener? clientListener,
-      List<RegExp> ignoreUrlPatterns = const []}) {
+  void enableHttpTracking({
+    DatadogTrackingHttpClientListener? clientListener,
+    List<RegExp> ignoreUrlPatterns = const [],
+    Map<String, Object?> arguments = const {},
+  }) {
     addPlugin(DdHttpTrackingPluginConfiguration(
       clientListener: clientListener,
       ignoreUrlPatterns: ignoreUrlPatterns,
+      arguments: arguments,
     ));
   }
 }

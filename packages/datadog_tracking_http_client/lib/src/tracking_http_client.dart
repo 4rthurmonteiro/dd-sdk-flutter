@@ -112,7 +112,12 @@ class DatadogTrackingHttpClient implements HttpClient {
         try {
           rumKey = uuid.v1();
           final rumHttpMethod = rumMethodFromMethodString(method);
-          rum.startResource(rumKey, rumHttpMethod, url.toString());
+          rum.startResource(
+            rumKey,
+            rumHttpMethod,
+            url.toString(),
+            configuration.arguments,
+          );
         } catch (e, st) {
           datadogSdk.internalLogger.sendToDatadog(
             '$DatadogTrackingHttpClient encountered an error while attempting'
@@ -139,7 +144,14 @@ class DatadogTrackingHttpClient implements HttpClient {
     } catch (e) {
       if (rum != null && rumKey != null) {
         rum.stopResourceWithErrorInfo(
-            rumKey, e.toString(), e.runtimeType.toString(), userAttributes);
+          rumKey,
+          e.toString(),
+          e.runtimeType.toString(),
+          _mergeAttributes(
+            userAttributes,
+            configuration.arguments,
+          ),
+        );
       }
       rethrow;
     }
@@ -383,7 +395,14 @@ class _DatadogTrackingHttpRequest implements HttpClientRequest {
         );
         attributes = _mergeAttributes(attributes, userAttributes);
         rum.stopResourceWithErrorInfo(
-            rumKey!, e.toString(), e.runtimeType.toString(), attributes);
+          rumKey!,
+          e.toString(),
+          e.runtimeType.toString(),
+          _mergeAttributes(
+            attributes,
+            client.configuration.arguments,
+          ),
+        );
       }
     } catch (e, st) {
       client.datadogSdk.internalLogger.sendToDatadog(
@@ -553,8 +572,15 @@ class _DatadogTrackingHttpResponse extends Stream<List<int>>
           userAttributes: userAttributes,
           error: lastError);
       attributes = _mergeAttributes(attributes, userAttributes);
-      rum.stopResourceWithErrorInfo(rumKey!, lastError.toString(),
-          lastError.runtimeType.toString(), attributes);
+      rum.stopResourceWithErrorInfo(
+        rumKey!,
+        lastError.toString(),
+        lastError.runtimeType.toString(),
+        _mergeAttributes(
+          attributes,
+          client.configuration.arguments,
+        ),
+      );
     }
   }
 
@@ -578,7 +604,16 @@ class _DatadogTrackingHttpResponse extends Stream<List<int>>
             userAttributes: userAttributes,
           );
           attributes = _mergeAttributes(attributes, userAttributes);
-          rum.stopResource(rumKey!, statusCode, resourceType, size, attributes);
+          rum.stopResource(
+            rumKey!,
+            statusCode,
+            resourceType,
+            size,
+            _mergeAttributes(
+              attributes,
+              client.configuration.arguments,
+            ),
+          );
         }
       }
     } catch (e, st) {
