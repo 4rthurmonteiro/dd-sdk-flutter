@@ -60,6 +60,22 @@ extension DatadogInternal on DatadogSdk {
   }
 }
 
+String? sanitizeHost(String host, InternalLogger internalLogger) {
+  final uri = Uri.tryParse(host);
+  if (uri != null) {
+    if (uri.hasScheme) {
+      internalLogger
+          .warn('$host is a url and will be sanitized to: ${uri.host}.');
+      host = uri.host;
+    }
+
+    return host;
+  }
+
+  internalLogger.warn('$host is a not a valid url and will be dropped');
+  return null;
+}
+
 /// Used to attach a first party host name to what headers should be
 /// automatically attached by RUM Http Tracking
 @immutable
@@ -80,7 +96,7 @@ class FirstPartyHost {
       Map<String, Set<TracingHeaderType>> hosts, InternalLogger logger) {
     var firstPartyHosts = <FirstPartyHost>[];
     for (var entry in hosts.entries) {
-      var sanitizedHost = _sanitizeHost(entry.key, logger);
+      var sanitizedHost = sanitizeHost(entry.key, logger);
       if (sanitizedHost != null) {
         firstPartyHosts.add(FirstPartyHost._(sanitizedHost, entry.value));
       }
@@ -88,20 +104,8 @@ class FirstPartyHost {
 
     return firstPartyHosts;
   }
+}
 
-  static String? _sanitizeHost(String host, InternalLogger internalLogger) {
-    final uri = Uri.tryParse(host);
-    if (uri != null) {
-      if (uri.hasScheme) {
-        internalLogger
-            .warn('$host is a url and will be sanitized to: ${uri.host}.');
-        host = uri.host;
-      }
-
-      return host;
-    }
-
-    internalLogger.warn('$host is a not a valid url and will be dropped');
-    return null;
-  }
+extension DatadogRumInternal on DatadogRum {
+  TraceContextInjection get contextInjectionSetting => traceContextInjection;
 }

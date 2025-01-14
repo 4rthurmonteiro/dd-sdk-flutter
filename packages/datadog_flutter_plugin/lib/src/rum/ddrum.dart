@@ -93,6 +93,9 @@ class DatadogRum {
   /// See [DatadogRumConfiguration.traceSampleRate]
   final double traceSampleRate;
 
+  @internal
+  final TraceContextInjection traceContextInjection;
+
   final _sampleRandom = Random();
   final InternalLogger logger;
 
@@ -112,6 +115,7 @@ class DatadogRum {
   @internal
   DatadogRum.fromExisting(DatadogSdk core, DatadogAttachConfiguration config)
       : traceSampleRate = config.traceSampleRate,
+        traceContextInjection = config.traceContextInjection,
         logger = core.internalLogger {
     _init(
       core: core,
@@ -123,6 +127,7 @@ class DatadogRum {
 
   DatadogRum._(DatadogSdk core, DatadogRumConfiguration configuration)
       : traceSampleRate = configuration.traceSampleRate,
+        traceContextInjection = configuration.traceContextInjection,
         logger = core.internalLogger {
     _init(
       core: core,
@@ -138,25 +143,36 @@ class DatadogRum {
     required double longTaskThreshold,
     required bool reportFlutterPerformance,
   }) {
-    // Never use long task observer on web -- the Browser SDK should
-    // capture stalls on the main thread automatically.
-    if (!kIsWeb && detectLongTasks) {
-      _longTaskObserver = RumLongTaskObserver(
-        longTaskThreshold: longTaskThreshold,
-        rumInstance: this,
-      );
-      _longTaskObserver!.init();
-    }
-    if (reportFlutterPerformance) {
-      ambiguate(SchedulerBinding.instance)
-          ?.addTimingsCallback(_timingsCallback);
-    }
+    final isBackgroundIsolate =
+        kIsWeb ? false : ServicesBinding.rootIsolateToken == null;
+    // Don't allow initialization of foreground stuff in background isolates
+    if (!isBackgroundIsolate) {
+      // Never use long task observer on web -- the Browser SDK should
+      // capture stalls on the main thread automatically.
+      if (!kIsWeb && detectLongTasks) {
+        _longTaskObserver = RumLongTaskObserver(
+          longTaskThreshold: longTaskThreshold,
+          rumInstance: this,
+        );
+        _longTaskObserver!.init();
+      }
+      if (reportFlutterPerformance) {
+        ambiguate(SchedulerBinding.instance)
+            ?.addTimingsCallback(_timingsCallback);
+      }
 
-    core.updateConfigurationInfo(
-        LateConfigurationProperty.trackFlutterPerformance,
-        reportFlutterPerformance);
-    core.updateConfigurationInfo(
-        LateConfigurationProperty.trackCrossPlatformLongTasks, detectLongTasks);
+      core.updateConfigurationInfo(
+          LateConfigurationProperty.trackFlutterPerformance,
+          reportFlutterPerformance);
+      core.updateConfigurationInfo(
+          LateConfigurationProperty.trackCrossPlatformLongTasks,
+          detectLongTasks);
+    } else {
+      if (detectLongTasks || reportFlutterPerformance) {
+        logger.warn(
+            'Attaching to the DatadogSdk from a background isolate does not support detecting long tasks or reporting Flutter performance.');
+      }
+    }
   }
 
   /// FOR INTERNAL USE ONLY
@@ -206,6 +222,18 @@ class DatadogRum {
   void addTiming(String name) {
     wrap('rum.addTiming', logger, null, () {
       return _platform.addTiming(name);
+    });
+  }
+
+  /// Adds view loading time to current RUM view based on the time elapsed since
+  /// the view was started. If this method is called multiple times, only the
+  /// first timing is used, unless [overwrite] is set to [true]. If [overwrite]
+  /// is [true], the new load timing overwrites any previous value.
+  ///
+  /// *Note*: This API is experimental and may change in the future.
+  void addViewLoadingTime({bool override = false}) {
+    wrap('rum.addViewLoadingTime', logger, null, () {
+      return _platform.addViewLoadingTime(override);
     });
   }
 

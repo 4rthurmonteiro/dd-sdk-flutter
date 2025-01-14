@@ -37,3 +37,4 @@ build,protobuf,BSD-3-Clause,"Copyright 2013, the Dart project authors."
 import,webview_flutter,BSD-3-Clause,Copyright 2013 The Flutter Authors.
 import,webview_flutter_android,BSD-3-Clause,Copyright 2013 The Flutter Authors.
 import,webview_flutter_wkwebview,BSD-3-Clause,Copyright 2013 The Flutter Authors.
+import,flutter_inappwebview,Apache-2.0,"Copyright © 2024 Flutter InAppWebView, Inc."

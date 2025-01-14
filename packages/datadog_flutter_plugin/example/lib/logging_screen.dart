@@ -2,13 +2,17 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2016-Present Datadog, Inc.
 
+import 'dart:isolate';
+
 import 'package:datadog_flutter_plugin/datadog_flutter_plugin.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 enum LogLevel { debug, info, notice, warn, error }
 
 class LoggingScreen extends StatefulWidget {
-  const LoggingScreen({Key? key}) : super(key: key);
+  const LoggingScreen({super.key});
 
   @override
   State<LoggingScreen> createState() => _LoggingScreenState();
@@ -62,6 +66,12 @@ class _LoggingScreenState extends State<LoggingScreen> {
         .showSnackBar(const SnackBar(content: Text('Sent $message')));
   }
 
+  void _sendFromBackgroundIsolate() {
+    final rootIsolateToken = ServicesBinding.rootIsolateToken;
+
+    Isolate.spawn(sendBackgroundLogs, rootIsolateToken!);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -97,34 +107,28 @@ class _LoggingScreenState extends State<LoggingScreen> {
               onPressed: () => _sendErrorWithExceptionLog(),
               child: const Text('Error With Exception Log'),
             ),
+            if (!kIsWeb)
+              ElevatedButton(
+                onPressed: () => _sendFromBackgroundIsolate(),
+                child: const Text('Send From Background Isolate'),
+              ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildField({String? text, required Widget child}) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.only(top: 6, bottom: 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (text != null)
-            Text(
-              text,
-              style: theme.textTheme.titleSmall,
-            ),
-          Container(padding: const EdgeInsets.all(4), child: child),
-        ],
-      ),
-    );
-  }
+void sendBackgroundLogs(RootIsolateToken rootIsolateToken) async {
+  BackgroundIsolateBinaryMessenger.ensureInitialized(rootIsolateToken);
 
-  Widget _buildSegment(String title) {
-    return Container(
-      padding: const EdgeInsets.all(5),
-      child: Text(title),
-    );
-  }
+  await DatadogSdk.instance.attachToExisting(DatadogAttachConfiguration(
+    detectLongTasks: true,
+  ));
+
+  final logger = DatadogSdk.instance.logs?.createLogger(
+    DatadogLoggerConfiguration(),
+  );
+
+  logger?.debug('Testing background isolate logging');
 }

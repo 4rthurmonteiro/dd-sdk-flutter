@@ -2,15 +2,7 @@
 format_version: '11'
 default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
 project_type: flutter
-trigger_map:
-- push_branch: main
-  pipeline: primary
-- push_branch: develop
-  pipeline: primary
-- push_branch: release/*
-  pipeline: primary
-- pull_request_source_branch: "*"
-  pipeline: pull_request
+trigger_map: []
 pipelines:
   primary:
     stages:
@@ -131,6 +123,7 @@ workflows:
         - working_dir: "$BITRISE_SOURCE_DIR/tools/third_party_scanner"
   core_build:
     envs:
+    - IOS_SIMULATOR: "iPhone 14"
     - FLUTTER_VERSION: stable
     after_run:
     - _setup
@@ -166,6 +159,8 @@ workflows:
         stack: linux-docker-android-20.04
         machine_type_id: standard
   integration_ios:
+    envs:
+    - IOS_SIMULATOR: "iPhone 14"
     steps:
     - script:
         title: iOS Integration Tests

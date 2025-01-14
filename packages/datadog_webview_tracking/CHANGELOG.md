@@ -1,8 +1,16 @@
 # Changelog
 
-## Unreleased
+## 2.1.0
 
+* Update constraints on compatible versions of `datadog-sdk-android-webview`.
 
+## 2.0.3
+
+* Constrain to compatible versions of `datadog_flutter_plugin`
+
+## 2.0.2
+
+* Re-restrict `datadog_webview_plugin` version.
 
 ## 2.0.1
 

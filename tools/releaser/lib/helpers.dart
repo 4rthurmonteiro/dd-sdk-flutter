@@ -9,6 +9,11 @@ import 'package:git/git.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
 
+bool hasNativeDependency(String packageName) {
+  return packageName == 'datadog_flutter_plugin' ||
+      packageName == 'datadog_webview_tracking';
+}
+
 Future<GitDir?> getGitDir() async {
   final currentPath = path.current;
 
@@ -45,7 +50,9 @@ Future<void> transformFile(
   logger.finest(' ------- NEW  $filename CONTENTS ------');
   logger.finest(newFileBuffer.toString());
   if (!dryRun) {
-    file.openWrite().write(newFileBuffer);
+    final sync = file.openWrite();
+    sync.write(newFileBuffer);
+    await sync.flush();
     logger.info(' ✏️ Wrote ${file.path}');
   }
 }

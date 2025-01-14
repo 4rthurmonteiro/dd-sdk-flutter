@@ -158,7 +158,22 @@ class DatadogGqlLink extends Link {
       attributes[_GraphQLAttributes.operationName] = operationName;
     }
 
-    attributes[_GraphQLAttributes.variables] = jsonEncode(request.variables);
+    try {
+      attributes[_GraphQLAttributes.variables] = jsonEncode(
+        request.variables,
+        toEncodable: (nonEncodable) {
+          // Non-encodable variables should just use their string representations
+          return nonEncodable.toString();
+        },
+      );
+    } catch (e, st) {
+      datadogSdk.internalLogger.error('Error encodeing GraphQL variables: $e.');
+      datadogSdk.internalLogger.sendToDatadog(
+        '$DatadogGqlLink encountered an error while attempting to encode variables: $e',
+        st,
+        e.runtimeType.toString(),
+      );
+    }
 
     return attributes;
   }
@@ -198,7 +213,8 @@ class DatadogGqlLink extends Link {
           final tracingContext = generateTracingContext(shouldSample);
 
           for (final headerType in tracingHeaderTypes) {
-            final newHeaders = getTracingHeaders(tracingContext, headerType);
+            final newHeaders = getTracingHeaders(tracingContext, headerType,
+                contextInjection: rum.contextInjectionSetting);
             for (final entry in newHeaders.entries) {
               // Don't replace exiting headers
               if (!headers.containsKey(entry.key)) {

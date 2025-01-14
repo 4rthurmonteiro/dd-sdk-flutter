@@ -52,7 +52,8 @@ class DatadogRumPluginTest {
     @BeforeEach
     fun beforeEach() {
         monitorProxy = MockRumMonitor()
-        plugin = DatadogRumPlugin(monitorProxy)
+        plugin = DatadogRumPlugin()
+        plugin.rum = monitorProxy
     }
 
     @AfterEach
@@ -169,11 +170,13 @@ class DatadogRumPluginTest {
         forge: Forge
     ) {
         // GIVEN
+        val trackNonFatalAnrs = forge.aNullable { forge.aBool() }
         val attributes = forge.exhaustiveAttributes()
         val configArg = mapOf(
             "sessionSampleRate" to sessionSampleRate,
             "longTaskThreshold" to longTaskThreshold,
             "trackFrustrations" to trackFrustration,
+            "trackNonFatalAnrs" to trackNonFatalAnrs,
             "customEndpoint" to endpoint,
             "vitalsUpdateFrequency" to "VitalsFrequency.frequent",
             "telemetrySampleRate" to telemetrySampleRate,
@@ -189,6 +192,12 @@ class DatadogRumPluginTest {
         val featureConfiguration: Any = config.getFieldValue("featureConfiguration")
         assertThat(featureConfiguration.getPrivate("sampleRate")).isEqualTo(sessionSampleRate)
         assertThat(featureConfiguration.getPrivate("trackFrustrations")).isEqualTo(trackFrustration)
+        if (trackNonFatalAnrs != null) {
+            assertThat(featureConfiguration.getPrivate("trackNonFatalAnrs")).isEqualTo(trackNonFatalAnrs)
+        } else {
+            // If null, default shouldn't be changed. Tests are run on a version that enables ANR tracking by default
+            assertThat(featureConfiguration.getPrivate("trackNonFatalAnrs")).isEqualTo(true)
+        }
         assertThat(featureConfiguration.getPrivate("customEndpointUrl")).isEqualTo(endpoint)
         assertThat(featureConfiguration.getPrivate("vitalsMonitorUpdateFrequency"))
             .isEqualTo(VitalsUpdateFrequency.FREQUENT)
@@ -442,6 +451,25 @@ class DatadogRumPluginTest {
 
         // THEN
         verify { monitorProxy.mockMonitor.addTiming(timingName) }
+        verify { mockResult.success(null) }
+    }
+
+    @Test
+    fun `M call monitor addViewLoadingTime W addViewLoadingTime is called`(
+        @BoolForgery overwrite: Boolean
+    ) {
+        // GIVEN
+        val call = MethodCall("addViewLoadingTime", mapOf(
+            "overwrite" to overwrite
+        ))
+        val mockResult = mockk<MethodChannel.Result>()
+        every { mockResult.success(any()) } returns Unit
+
+        // WHEN
+        plugin.onMethodCall(call, mockResult)
+
+        // THEN
+        verify { monitorProxy.mockMonitor.addViewLoadingTime(overwrite) }
         verify { mockResult.success(null) }
     }
 
@@ -709,6 +737,9 @@ class DatadogRumPluginTest {
         )),
         Contract("addTiming", mapOf(
             "name" to ContractParameter.Type(SupportedContractType.STRING),
+        )),
+        Contract("addViewLoadingTime", mapOf(
+            "overwrite" to ContractParameter.Type(SupportedContractType.BOOL),
         )),
         Contract("startResource", mapOf(
             "key" to ContractParameter.Type(SupportedContractType.STRING),

@@ -27,8 +27,7 @@ class UpdateVersionsCommand extends Command {
       }
     }
 
-    return _updateChangelogUnreleasedChanges(
-        args.packageRoot, args.version, logger, args.dryRun);
+    return true;
   }
 }
 
@@ -61,9 +60,7 @@ class BumpVersionCommand extends Command {
         }
         break;
     }
-    logger.info('🔀 Adding "Unreleased" back into CHANGELOG');
-    await _updateChangelogAddUnreleased(args.packageRoot, logger, args.dryRun);
-
+    
     logger.info('🔀 Bumping version to $newVersion');
     return updateVersions(
         args.packageRoot, newVersion.toString(), logger, args.dryRun);
@@ -118,43 +115,6 @@ Future<bool> _updateVersionDartFile(
     if (element.startsWith('const ddPackageVersion')) {
       element = "const ddPackageVersion = '$version';";
     }
-    return element;
-  });
-
-  return true;
-}
-
-Future<bool> _updateChangelogUnreleasedChanges(
-    String packageRoot, String version, Logger logger, bool dryRun) async {
-  final changelogFile = File(path.join(packageRoot, 'CHANGELOG.md'));
-  if (!changelogFile.existsSync()) {
-    logger.shout('⁉️ Could not find CHANGELOG.md at ${changelogFile.path}');
-    return false;
-  }
-
-  await transformFile(changelogFile, logger, dryRun, (element) {
-    if (element.startsWith('## Unreleased')) {
-      element = '## $version';
-    }
-    return element;
-  });
-
-  return true;
-}
-
-Future<bool> _updateChangelogAddUnreleased(
-    String packageRoot, Logger logger, bool dryRun) async {
-  final changelogFile = File(path.join(packageRoot, 'CHANGELOG.md'));
-  if (!changelogFile.existsSync()) {
-    logger.shout('⁉️ Could not find CHANGELOG.md at ${changelogFile.path}');
-    return false;
-  }
-
-  await transformFile(changelogFile, logger, dryRun, (element) {
-    if (element.startsWith('# Changelog')) {
-      element += '\n\n## Unreleased\n\n';
-    }
-
     return element;
   });
 

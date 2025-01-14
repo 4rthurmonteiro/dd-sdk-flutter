@@ -11,6 +11,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 
 import 'app.dart';
+import 'url_strategy_stub.dart' if (dart.library.html) 'url_strategy_web.dart';
 
 const graphQlUrl = 'http://localhost:3000/graphql';
 
@@ -18,6 +19,7 @@ void main() async {
   await dotenv.load();
 
   WidgetsFlutterBinding.ensureInitialized();
+  configureUrlStrategy();
 
   DatadogSdk.instance.sdkVerbosity = CoreLoggerLevel.debug;
 

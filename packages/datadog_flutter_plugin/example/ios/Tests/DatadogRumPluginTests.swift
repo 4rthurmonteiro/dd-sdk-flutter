@@ -119,6 +119,9 @@ class DatadogRumPluginTests: XCTestCase {
         Contract(methodName: "addTiming", requiredParameters: [
             "name": .string
         ]),
+        Contract(methodName: "addViewLoadingTime", requiredParameters: [
+            "overwrite": .bool
+        ]),
         Contract(methodName: "startResource", requiredParameters: [
             "key": .string, "url": .string, "httpMethod": .string, "attributes": .map
         ]),
@@ -165,6 +168,17 @@ class DatadogRumPluginTests: XCTestCase {
         testContracts(contracts: contracts, plugin: plugin)
     }
 
+    func testRumConfiguration_WithAppHangThreshold_IsSetCorrectly() {
+        let appHangThreshold = Double.mockRandom()
+        let encoded: [String: Any?] = [
+            "applicationId": "fake-application-id",
+            "appHangThreshold": appHangThreshold
+        ]
+
+        let config = RUM.Configuration.init(fromEncoded: encoded)
+        XCTAssertEqual(config?.appHangThreshold, appHangThreshold)
+    }
+
     func testRepeatEnable_FromMethodChannelSameOptions_DoesNothing() {
         // Uninitialize plugin
         plugin?.inject(rum: nil)
@@ -181,8 +195,8 @@ class DatadogRumPluginTests: XCTestCase {
         )
         plugin.handle(methodCallA) { _ in }
 
-        var loggedConsoleLines: [String] = []
-        consolePrint = { str, _ in loggedConsoleLines.append(str) }
+        let printMock = PrintFunctionMock()
+        consolePrint = printMock.print
 
         let methodCallB = FlutterMethodCall(
             methodName: "initialize",
@@ -192,9 +206,7 @@ class DatadogRumPluginTests: XCTestCase {
         )
         plugin.handle(methodCallB) { _ in }
 
-        print(loggedConsoleLines)
-
-        XCTAssertTrue(loggedConsoleLines.isEmpty)
+        XCTAssertTrue(printMock.printedMessages.isEmpty)
     }
 
     func testRepeatEnable_FromMethodChannelDifferentOptions_PrintsError() {
@@ -211,8 +223,8 @@ class DatadogRumPluginTests: XCTestCase {
         )
         plugin.handle(methodCallA) { _ in }
 
-        var loggedConsoleLines: [String] = []
-        consolePrint = { str, _ in loggedConsoleLines.append(str) }
+        let printMock = PrintFunctionMock()
+        consolePrint = printMock.print
 
         let methodCallB = FlutterMethodCall(
             methodName: "enable",
@@ -225,8 +237,8 @@ class DatadogRumPluginTests: XCTestCase {
         )
         plugin.handle(methodCallB) { _ in }
 
-        XCTAssertFalse(loggedConsoleLines.isEmpty)
-        XCTAssertTrue(loggedConsoleLines.first?.contains("🔥") == true)
+        XCTAssertFalse(printMock.printedMessages.isEmpty)
+        XCTAssertTrue(printMock.printedMessages.first?.contains("🔥") == true)
     }
 
     func testStartViewCall_CallsRumMonitor() {
@@ -273,6 +285,20 @@ class DatadogRumPluginTests: XCTestCase {
         }
 
         XCTAssertEqual(mock.callLog, [ .addTiming(name: "timing name") ])
+        XCTAssertEqual(resultStatus, .called(value: nil))
+    }
+
+    func testAddViewLoadingTime_CallsRumMonitor() {
+        let call = FlutterMethodCall(methodName: "addViewLoadingTime", arguments: [
+            "overwrite": true
+        ])
+
+        var resultStatus = ResultStatus.notCalled
+        plugin.handle(call) { result in
+            resultStatus = .called(value: result)
+        }
+
+        XCTAssertEqual(mock.callLog, [ .addViewLoadingTime(overwrite: true) ])
         XCTAssertEqual(resultStatus, .called(value: nil))
     }
 
@@ -567,6 +593,7 @@ class MockRUMMonitor: RUMMonitorProtocol, RUMCommandSubscriber {
         case startView(key: String, name: String?, attributes: [AttributeKey: AttributeValue])
         case stopView(key: String, attributes: [AttributeKey: AttributeValue])
         case addTiming(name: String)
+        case addViewLoadingTime(overwrite: Bool)
 
         case startResource(key: String, httpMethod: RUMMethod, urlString: String,
                            attributes: [AttributeKey: AttributeValue])
@@ -653,6 +680,10 @@ class MockRUMMonitor: RUMMonitorProtocol, RUMCommandSubscriber {
             .addError(message: message, type: type, source: source, stack: stack,
                       attributes: attributes, file: file, line: line)
         )
+    }
+
+    func addViewLoadingTime(overwrite: Bool) {
+        callLog.append(.addViewLoadingTime(overwrite: overwrite))
     }
 
     func addAttribute(forKey key: AttributeKey, value: AttributeValue) {

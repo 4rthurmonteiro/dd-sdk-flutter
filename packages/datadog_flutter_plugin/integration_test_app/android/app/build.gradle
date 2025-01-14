@@ -47,7 +47,7 @@ android {
     defaultConfig {
         applicationId "com.datadoghq.flutter.integrationtestapp"
         minSdkVersion 21
-        targetSdkVersion 33
+        targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true

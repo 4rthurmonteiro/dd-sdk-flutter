@@ -11,9 +11,59 @@ import 'package:mocktail/mocktail.dart';
 
 class MockDdRum extends Mock implements DatadogRum {}
 
+class _DescriptiveWidget extends StatelessWidget {
+  final Widget? child;
+
+  const _DescriptiveWidget({this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: 5,
+      child: Container(
+        color: Colors.white,
+        child: child,
+      ),
+    );
+  }
+}
+
+class _VagueWidget extends StatelessWidget {
+  final Widget? child;
+
+  const _VagueWidget({this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: 5,
+      child: Container(
+        color: Colors.white,
+        child: child,
+      ),
+    );
+  }
+}
+
 Widget _buildSimpleApp(DatadogRum rum, Widget innerWidget) {
   return RumUserActionDetector(
     rum: rum,
+    customGestureDetector: (widget) {
+      if (widget is _DescriptiveWidget) {
+        return RumGestureDetectorInfo(
+          'DescriptiveWidget',
+          searchForText: false,
+          searchForBetter: false,
+        );
+      } else if (widget is _VagueWidget) {
+        return RumGestureDetectorInfo(
+          'VagueWidget',
+          searchForBetter: true,
+          searchForText: true,
+        );
+      }
+      return null;
+    },
     child: MaterialApp(
       color: Colors.blueAccent,
       home: Scaffold(
@@ -513,5 +563,132 @@ void main() {
 
     verify(() => mockRum.addAction(RumActionType.tap, 'Tab(Rainy Days)'));
     verifyNoMoreInteractions(mockRum);
+  });
+
+  testWidgets('tap gesture detector with annotation reports attributes',
+      (tester) async {
+    final mockRum = MockDdRum();
+
+    final annotation = randomString();
+    final buttonText = randomString();
+    final attributes = {'test_key': randomString()};
+    await tester.pumpWidget(_buildSimpleApp(
+      mockRum,
+      RumUserActionAnnotation(
+        description: annotation,
+        attributes: attributes,
+        child: GestureDetector(
+          onTap: () {},
+          child: Text(buttonText),
+        ),
+      ),
+    ));
+
+    final text = find.byType(GestureDetector);
+    await tester.tap(text);
+
+    verify(() => mockRum.addAction(RumActionType.tap, any(), attributes));
+    verifyNoMoreInteractions(mockRum);
+  });
+
+  group('tap custom widget', () {
+    testWidgets('reports tap to RUM with unknown annotation by default',
+        (tester) async {
+      final mockRum = MockDdRum();
+
+      await tester.pumpWidget(_buildSimpleApp(
+        mockRum,
+        _DescriptiveWidget(),
+      ));
+
+      final button = find.byType(_DescriptiveWidget);
+      await tester.tap(button);
+
+      verify(() =>
+          mockRum.addAction(RumActionType.tap, 'DescriptiveWidget(unknown)'));
+    });
+
+    testWidgets('reports tap to RUM and search for better widget',
+        (tester) async {
+      final mockRum = MockDdRum();
+
+      final annotation = randomString();
+      await tester.pumpWidget(_buildSimpleApp(
+        mockRum,
+        _VagueWidget(
+          child: ElevatedButton(
+            onPressed: () {},
+            child: Text(annotation),
+          ),
+        ),
+      ));
+
+      final button = find.byType(_VagueWidget);
+      await tester.tap(button);
+
+      verify(() => mockRum.addAction(RumActionType.tap, 'Button($annotation)'));
+    });
+
+    testWidgets('reports tap to RUM and search for text', (tester) async {
+      final mockRum = MockDdRum();
+
+      final annotation = randomString();
+      await tester.pumpWidget(_buildSimpleApp(
+        mockRum,
+        _VagueWidget(
+          child: Text(annotation),
+        ),
+      ));
+
+      final button = find.byType(_VagueWidget);
+      await tester.tap(button);
+
+      verify(() =>
+          mockRum.addAction(RumActionType.tap, 'VagueWidget($annotation)'));
+    });
+
+    testWidgets(
+        'reports tap to RUM '
+        'and do not search for text '
+        'and do not search for better widget', (tester) async {
+      final mockRum = MockDdRum();
+
+      final annotation = randomString();
+      await tester.pumpWidget(_buildSimpleApp(
+        mockRum,
+        _DescriptiveWidget(
+          child: ElevatedButton(
+            onPressed: () {},
+            child: Text(annotation),
+          ),
+        ),
+      ));
+
+      final button = find.byType(_DescriptiveWidget);
+      await tester.tap(button);
+
+      verify(() =>
+          mockRum.addAction(RumActionType.tap, 'DescriptiveWidget(unknown)'));
+    });
+
+    testWidgets('with annotation reports description', (tester) async {
+      final mockRum = MockDdRum();
+
+      final annotation = randomString();
+      await tester.pumpWidget(_buildSimpleApp(
+        mockRum,
+        RumUserActionAnnotation(
+          description: annotation,
+          child: _DescriptiveWidget(),
+        ),
+      ));
+
+      final text = find.byType(_DescriptiveWidget);
+      await tester.tap(text);
+
+      verify(() => mockRum.addAction(
+          RumActionType.tap, 'DescriptiveWidget($annotation)'));
+      verifyNoMoreInteractions(mockRum);
+    });
   });
 }

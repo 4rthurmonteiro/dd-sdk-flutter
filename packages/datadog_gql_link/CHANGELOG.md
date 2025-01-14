@@ -2,7 +2,11 @@
 
 ## Unreleased
 
+* Add support for `TraceContextInjection` configuration.
 
+## 1.1.1
+
+* Fix an exception when attempting to `jsonEncode` unencodable variables.
 
 ## 1.1.0
 

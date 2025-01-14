@@ -19,6 +19,7 @@ final projectList = [
   '$root/packages/datadog_grpc_interceptor',
   '$root/packages/datadog_tracking_http_client',
   '$root/packages/datadog_webview_tracking',
+  '$root/packages/datadog_inappwebview_tracking',
   '$root/tools/e2e_generator',
   '$root/tools/releaser',
   '$root/tools/third_party_scanner',

@@ -56,7 +56,10 @@ class _LoggingScenarioState extends State<LoggingScenario> {
           errorMessage: e.toString(), errorStackTrace: st);
     }
 
-    final config = DatadogLoggerConfiguration(name: 'second_logger');
+    final config = DatadogLoggerConfiguration(
+      name: 'second_logger',
+      networkInfoEnabled: false,
+    );
     final secondLogger = DatadogSdk.instance.logs!.createLogger(config);
 
     secondLogger.addAttribute('second-logger-attribute', 'second-value');

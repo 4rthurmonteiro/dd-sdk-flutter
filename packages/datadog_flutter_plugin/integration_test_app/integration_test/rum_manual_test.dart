@@ -131,12 +131,18 @@ void main() {
 
     final contentReadyTiming =
         view1.viewEvents.last.view.customTimings['content-ready'];
+    final viewLoadingTiming = view1.viewEvents.last.view.loadingTime;
     final firstInteractionTiming =
         view1.viewEvents.last.view.customTimings['first-interaction'];
     expect(contentReadyTiming, isNotNull);
     expect(contentReadyTiming, greaterThanOrEqualTo(50 * 1000 * 1000));
     // TODO: Figure out why occasionally these have really high values
     // expect(contentReadyTiming, lessThan(200 * 1000 * 100));
+    if (!kIsWeb) {
+      expect(viewLoadingTiming, isNotNull);
+      expect(viewLoadingTiming,
+          closeTo(contentReadyTiming!, 5000000)); // Within 5ms
+    }
     expect(firstInteractionTiming, isNotNull);
     expect(firstInteractionTiming, greaterThanOrEqualTo(contentReadyTiming!));
     // TODO: Figure out why occasionally these have really high values
@@ -161,6 +167,20 @@ void main() {
       expect(view1.errorEvents[0].errorType, 'ErrorLoading');
       expect(view1.errorEvents[0].source, 'network');
       expect(view1.errorEvents[0].context![contextKey], expectedContextValue);
+    }
+
+    // Verify user in all events, except for the first view event
+    for (final viewEvent in view1.viewEvents.sublist(1)) {
+      verifyUser(viewEvent);
+    }
+    for (final actionEvent in view1.actionEvents) {
+      verifyUser(actionEvent);
+    }
+    for (final resourceEvent in view1.resourceEvents) {
+      verifyUser(resourceEvent);
+    }
+    for (final errorEvent in view1.errorEvents) {
+      verifyUser(errorEvent);
     }
 
     expect(view1, becameInactive);

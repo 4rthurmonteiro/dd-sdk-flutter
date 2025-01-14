@@ -55,9 +55,9 @@ void main() {
             .whereType<List<dynamic>>()
             .expand<dynamic>((e) => e)
             .whereType<Map<String, Object?>>()
-            // Ignore RUM sessions and telemetry
+            // Only include logs, ignore telemetry
             .where((e) {
-              return !(e).containsKey('session') && e['type'] != 'telemetry';
+              return e['message'] != null && e['type'] != 'telemetry';
             })
             .forEach((e) => logs.add(LogDecoder(e)));
         return logs.length >= 8;
@@ -67,6 +67,15 @@ void main() {
 
     List<LogDecoder> firstLoggerLogs =
         logs.where((l) => l.loggerName != 'second_logger').toList();
+    if (!kIsWeb) {
+      for (final log in firstLoggerLogs) {
+        if (Platform.isAndroid) {
+          expect(log.log['network'], isNotNull);
+        } else if (Platform.isIOS) {
+          expect(log.log['network.client.reachability'], isNotNull);
+        }
+      }
+    }
 
     expect(firstLoggerLogs[0].status, 'debug');
     expect(firstLoggerLogs[0].message, 'debug message');
@@ -140,6 +149,15 @@ void main() {
 
     List<LogDecoder> secondLoggerLogs =
         logs.where((l) => l.loggerName == 'second_logger').toList();
+    if (!kIsWeb) {
+      for (final log in secondLoggerLogs) {
+        if (Platform.isAndroid) {
+          expect(log.log['network'], isNull);
+        } else if (Platform.isIOS) {
+          expect(log.log['network.client.reachability'], isNull);
+        }
+      }
+    }
 
     expect(secondLoggerLogs[0].status, 'info');
     expect(secondLoggerLogs[0].message, 'message on second logger');

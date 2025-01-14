@@ -2,15 +2,16 @@
 // This product includes software developed at Datadog (https://www.datadoghq.com/).
 // Copyright 2019-2022 Datadog, Inc.
 
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:datadog_common_test/datadog_common_test.dart';
 import 'package:datadog_tracking_http_client_example/main.dart' as app;
 import 'package:datadog_tracking_http_client_example/scenario_config.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+import 'common.dart';
 import 'tracing_id_helpers.dart';
 
 Future<void> performRumUserFlow(WidgetTester tester) async {
@@ -30,15 +31,11 @@ Future<void> performRumUserFlow(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-void main() async {
+void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  final mockHttpServer = RecordingHttpServer();
-  unawaited(mockHttpServer.start());
-  final sessionRecorder = LocalRecordingServerClient(mockHttpServer);
-
   testWidgets('test auto instrumentation', (WidgetTester tester) async {
-    await sessionRecorder.startNewSession();
+    final sessionRecorder = await startMockServer();
 
     const clientToken = bool.hasEnvironment('DD_CLIENT_TOKEN')
         ? String.fromEnvironment('DD_CLIENT_TOKEN')
@@ -54,7 +51,11 @@ void main() async {
       firstPartyBadUrl: 'https://foo.bar',
       thirdPartyGetUrl: 'https://httpbingo.org/get',
       thirdPartyPostUrl: 'https://httpbingo.org/post',
-      enableIoHttpTracking: false,
+      // TODO(RUM-7120): The only way to enable resource tracking on Web at the moment
+      // is to call `enableHttpTracking`, which enables it globally. This isn't
+      // in line with what's expected from package:http or Dio, which expect
+      // to track only the calls from their clients.
+      enableIoHttpTracking: kIsWeb ? true : false,
     );
     RumAutoInstrumentationScenarioConfig.instance = scenarioConfig;
 
@@ -77,7 +78,10 @@ void main() async {
         requestLog.addAll(requests);
         for (var request in requests) {
           if (request.requestedUrl.contains('integration')) {
-            testRequests.add(request);
+            if (!request.requestHeaders
+                .containsKey('access-control-request-method')) {
+              testRequests.add(request);
+            }
           } else {
             request.data.split('\n').forEach((e) {
               var jsonValue = json.decode(e);
@@ -96,12 +100,16 @@ void main() async {
 
     final view1 = session.visits[1];
     // Images are not fetched with http.Client, so we don't expect them in
-    // the final view
-    expect(view1.viewEvents.last.view.resourceCount, 0);
+    // the final view on mobile
+    if (!kIsWeb) {
+      expect(view1.viewEvents.last.view.resourceCount, 0);
+    }
 
     final view2 = session.visits[2];
-    expect(view2.viewEvents.last.view.resourceCount, 4);
-    expect(view2.viewEvents.last.view.errorCount, 1);
+    expect(view2.viewEvents.last.view.resourceCount, kIsWeb ? 5 : 4);
+    if (!kIsWeb) {
+      expect(view2.viewEvents.last.view.errorCount, 1);
+    }
 
     // Check first party requests
     for (var testRequest in testRequests) {
@@ -118,7 +126,7 @@ void main() async {
     expect(getEvent.statusCode, 200);
     expect(getEvent.method, 'GET');
     expect(getEvent.duration, greaterThan(0));
-    expect(getEvent.dd.traceId, getTraceId?.toRadixString(16));
+    expect(getEvent.dd.traceId, getTraceId?.toRadixString(kIsWeb ? 10 : 16));
     expect(getEvent.dd.spanId, getSpanId!);
 
     final postTraceId = extractDatadogTraceId(testRequests[1].requestHeaders);
@@ -129,23 +137,38 @@ void main() async {
     expect(postEvent.statusCode, 200);
     expect(postEvent.method, 'POST');
     expect(postEvent.duration, greaterThan(0));
-    expect(postEvent.dd.traceId, postTraceId?.toRadixString(16));
+    expect(postEvent.dd.traceId, postTraceId?.toRadixString(kIsWeb ? 10 : 16));
     expect(postEvent.dd.spanId, postSpanId!);
 
     // Third party requests
-    expect(view2.errorEvents[0].resourceUrl, scenarioConfig.firstPartyBadUrl);
-    expect(view2.errorEvents[0].resourceMethod, 'GET');
+    int thirdPartyResourceIndex = 2;
+    if (!kIsWeb) {
+      expect(view2.errorEvents[0].resourceUrl,
+          startsWith(scenarioConfig.firstPartyBadUrl));
+      expect(view2.errorEvents[0].resourceMethod, 'GET');
+    } else {
+      expect(view2.resourceEvents[2].url,
+          startsWith(scenarioConfig.firstPartyBadUrl));
+      expect(view2.resourceEvents[2].method, 'GET');
+      thirdPartyResourceIndex = 3;
+    }
 
-    expect(view2.resourceEvents[2].url, scenarioConfig.thirdPartyGetUrl);
-    expect(view2.resourceEvents[2].method, 'GET');
-    expect(view2.resourceEvents[2].duration, greaterThan(0));
-    expect(view2.resourceEvents[2].dd.traceId, isNull);
-    expect(view2.resourceEvents[2].dd.spanId, isNull);
+    final firstThirdPartyResource =
+        view2.resourceEvents[thirdPartyResourceIndex];
+    expect(firstThirdPartyResource.url,
+        startsWith(scenarioConfig.thirdPartyGetUrl));
+    expect(firstThirdPartyResource.method, 'GET');
+    expect(firstThirdPartyResource.duration, greaterThan(0));
+    expect(firstThirdPartyResource.dd.traceId, isNull);
+    expect(firstThirdPartyResource.dd.spanId, isNull);
 
-    expect(view2.resourceEvents[3].url, scenarioConfig.thirdPartyPostUrl);
-    expect(view2.resourceEvents[3].method, 'POST');
-    expect(view2.resourceEvents[3].duration, greaterThan(0));
-    expect(view2.resourceEvents[3].dd.traceId, isNull);
-    expect(view2.resourceEvents[3].dd.spanId, isNull);
+    final secondThirdPartyResource =
+        view2.resourceEvents[thirdPartyResourceIndex + 1];
+    expect(secondThirdPartyResource.url,
+        startsWith(scenarioConfig.thirdPartyPostUrl));
+    expect(secondThirdPartyResource.method, 'POST');
+    expect(secondThirdPartyResource.duration, greaterThan(0));
+    expect(secondThirdPartyResource.dd.traceId, isNull);
+    expect(secondThirdPartyResource.dd.spanId, isNull);
   });
 }

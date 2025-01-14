@@ -35,6 +35,12 @@
             "request": "launch"
         },
         {
+            "name": "In App Webview example",
+            "type": "dart",
+            "cwd": "packages/datadog_inappwebview_tracking/example",
+            "request": "launch"
+        },
+        {
             "name": "auto instrumented app",
             "cwd": "packages/datadog_flutter_plugin/integration_test_app",
             "program": "lib/auto_integration_scenarios/main.dart",

@@ -26,7 +26,9 @@ class DdRumMethodChannel extends DdRumPlatform {
       internalLogger: core.internalLogger,
     );
 
-    methodChannel.setMethodCallHandler(callbackHandler.handleMethodCall);
+    if (ServicesBinding.rootIsolateToken != null) {
+      methodChannel.setMethodCallHandler(callbackHandler.handleMethodCall);
+    }
 
     return methodChannel.invokeMethod('enable', {
       'configuration': configuration.encode(),
@@ -127,6 +129,13 @@ class DdRumMethodChannel extends DdRumPlatform {
   ) {
     return addErrorInfo(
         error.toString(), source, stackTrace, errorType, attributes);
+  }
+
+  @override
+  Future<void> addViewLoadingTime(bool overwrite) {
+    return methodChannel.invokeMethod('addViewLoadingTime', {
+      'overwrite': overwrite,
+    });
   }
 
   @override
